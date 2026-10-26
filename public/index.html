@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backlog</title>
+</head>
+<body>
+<h1>Backlog</h1>
+<form id="add">
+  <input name="title" placeholder="Title" required>
+  <select name="kind"><option value="movie">Movie</option><option value="show">Show</option></select>
+  <button>Add</button>
+  <p id="err" role="alert"></p>
+</form>
+<ul id="list"></ul>
+<script>
+const list = document.getElementById('list'), err = document.getElementById('err');
+async function load() {
+  const titles = await (await fetch('/api/titles')).json();
+  list.replaceChildren(...titles.map((t) => {
+    const li = document.createElement('li');
+    li.textContent = `${t.title} (${t.kind})`;
+    return li;
+  }));
+}
+document.getElementById('add').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const res = await fetch('/api/titles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: f.title.value, kind: f.kind.value }),
+  });
+  err.textContent = res.ok ? '' : (await res.json()).error;
+  if (res.ok) { f.reset(); load(); }
+});
+load();
+</script>
+</body>
+</html>

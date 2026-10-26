@@ -1,10 +1,12 @@
 const express = require('express');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { authRoutes } = require('./auth');
 
 const KINDS = ['movie', 'show'];
 
-function createApp(dbPath) {
+function createApp(dbPath, { passcode, secret }) {
+  if (!passcode || !secret) throw new Error('passcode and secret are required');
   const db = new Database(dbPath);
   db.exec(`CREATE TABLE IF NOT EXISTS titles (
     id INTEGER PRIMARY KEY,
@@ -24,10 +26,13 @@ function createApp(dbPath) {
   )`);
 
   const app = express();
+  app.set('trust proxy', 1); // Azure terminates TLS in front of us
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
   app.get('/healthz', (req, res) => res.send('ok'));
+
+  authRoutes(app, { passcode, secret });
 
   app.get('/api/titles', (req, res) => {
     res.json(db.prepare('SELECT * FROM titles ORDER BY id DESC').all());
@@ -40,8 +45,8 @@ function createApp(dbPath) {
     if (!KINDS.includes(kind)) return res.status(400).json({ error: 'Kind must be movie or show' });
     const note = typeof req.body.note === 'string' ? req.body.note.trim() || null : null;
     const { lastInsertRowid } = db
-      .prepare('INSERT INTO titles (title, kind, note) VALUES (?, ?, ?)')
-      .run(title, kind, note);
+      .prepare('INSERT INTO titles (title, kind, note, added_by) VALUES (?, ?, ?, ?)')
+      .run(title, kind, note, req.user);
     res.status(201).json(db.prepare('SELECT * FROM titles WHERE id = ?').get(lastInsertRowid));
   });
 

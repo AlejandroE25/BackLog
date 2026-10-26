@@ -7,6 +7,14 @@
 </head>
 <body>
 <h1>Backlog</h1>
+<form id="login" hidden>
+  <input name="passcode" type="password" placeholder="Passcode" autocomplete="current-password" required>
+  <select name="name"><option value="me">I'm me</option><option value="friend">I'm friend</option></select>
+  <button>Enter</button>
+  <p id="loginErr" role="alert"></p>
+</form>
+<main id="app" hidden>
+<p><span id="who"></span> <button id="logout" type="button">Log out</button></p>
 <form id="add">
   <input name="title" placeholder="Title" required>
   <select name="kind"><option value="movie">Movie</option><option value="show">Show</option></select>
@@ -14,13 +22,33 @@
   <p id="err" role="alert"></p>
 </form>
 <ul id="list"></ul>
+</main>
 <script>
 const list = document.getElementById('list'), err = document.getElementById('err');
+const $ = (id) => document.getElementById(id);
+async function init() {
+  const res = await fetch('/api/me');
+  $('login').hidden = res.ok;
+  $('app').hidden = !res.ok;
+  if (res.ok) { $('who').textContent = `Signed in as ${(await res.json()).name}`; load(); }
+}
+$('login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ passcode: f.passcode.value, name: f.name.value }),
+  });
+  $('loginErr').textContent = res.ok ? '' : (await res.json()).error;
+  if (res.ok) { f.reset(); init(); }
+});
+$('logout').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); init(); });
 async function load() {
   const titles = await (await fetch('/api/titles')).json();
   list.replaceChildren(...titles.map((t) => {
     const li = document.createElement('li');
-    li.textContent = `${t.title} (${t.kind})`;
+    li.textContent = `${t.title} (${t.kind}) added by ${t.added_by}`;
     return li;
   }));
 }
@@ -35,7 +63,7 @@ document.getElementById('add').addEventListener('submit', async (e) => {
   err.textContent = res.ok ? '' : (await res.json()).error;
   if (res.ok) { f.reset(); load(); }
 });
-load();
+init();
 </script>
 </body>
 </html>

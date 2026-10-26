@@ -2,10 +2,11 @@ const express = require('express');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { authRoutes } = require('./auth');
+const { createOmdb, UpstreamError } = require('./omdb');
 
 const KINDS = ['movie', 'show'];
 
-function createApp(dbPath, { passcode, secret }) {
+function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
   if (!passcode || !secret) throw new Error('passcode and secret are required');
   const db = new Database(dbPath);
   db.exec(`CREATE TABLE IF NOT EXISTS titles (
@@ -33,6 +34,21 @@ function createApp(dbPath, { passcode, secret }) {
   app.get('/healthz', (req, res) => res.send('ok'));
 
   authRoutes(app, { passcode, secret });
+
+  const omdb = omdbKey && createOmdb({ apiKey: omdbKey, fetch });
+
+  app.get('/api/search', async (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (q.length < 2) return res.status(400).json({ error: 'Type at least 2 characters' });
+    if (!omdb) return res.status(503).json({ error: 'Search is not configured' });
+    try {
+      res.json(await omdb.search(q));
+    } catch (e) {
+      if (!(e instanceof UpstreamError)) throw e;
+      console.error(e.message);
+      res.status(502).json({ error: 'Search is unavailable right now' });
+    }
+  });
 
   app.get('/api/titles', (req, res) => {
     res.json(db.prepare('SELECT * FROM titles ORDER BY id DESC').all());

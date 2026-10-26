@@ -13,7 +13,7 @@ See plan.md for assumptions and acceptance criteria.
 - [x] **Checkpoint A**: live site, both users log in and add
 
 ## Phase 2: The nice part
-- [ ] T4. IMDb search proxy (OMDb), cached, error-safe
+- [x] T4. IMDb search proxy (OMDb), cached, error-safe
 - [ ] T5. Add-by-search UI with poster/name autofill, duplicate handling
 - [ ] T6. Queue poster grid (responsive, skeletons, empty state)
 - [ ] T7. Mark watched + review (owner only) + Watched view

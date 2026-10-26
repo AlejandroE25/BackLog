@@ -26,6 +26,7 @@ npm start                 # http://localhost:3000
 | `BACKLOG_PASSCODE` | Shared login passcode (required) |
 | `COOKIE_SECRET` | Signs the session cookie (required) |
 | `OMDB_API_KEY` | Search and autofill. Without it, search answers 503 |
+| `TMDB_TOKEN` | Optional. TMDB Read Access Token for the where-to-watch list (US). Without it the dialog shows only a JustWatch link |
 | `DB_PATH` | SQLite file. Default `data/backlog.db` |
 | `PORT` | Default 3000 |
 
@@ -41,7 +42,7 @@ Tests use an in-memory database and a fake OMDb, so they run offline. They cover
 
 Pushing to `main` deploys through `.github/workflows/main_backlog-ae42.yml`. The workflow does not run the tests, so run `npm test` first.
 
-App settings required on the web app: `BACKLOG_PASSCODE`, `COOKIE_SECRET`, `OMDB_API_KEY`, `DB_PATH=/home/data/backlog.db` (persistent storage), `SCM_DO_BUILD_DURING_DEPLOYMENT=true` (installs the native SQLite module).
+App settings required on the web app: `BACKLOG_PASSCODE`, `COOKIE_SECRET`, `OMDB_API_KEY`, optionally `TMDB_TOKEN`, `DB_PATH=/home/data/backlog.db` (persistent storage), `SCM_DO_BUILD_DURING_DEPLOYMENT=true` (installs the native SQLite module).
 
 `scripts/deploy.sh` creates the resource group, plan and app if they don't exist and deploys from your machine (`az login` first, secrets from `.env`). It never changes an existing plan or app.
 

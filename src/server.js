@@ -10,4 +10,4 @@ if (!passcode || !secret) {
   process.exit(1);
 }
 const port = process.env.PORT || 3000;
-createApp(dbPath, { passcode, secret, omdbKey: process.env.OMDB_API_KEY }).listen(port, () => console.log(`BackLog on :${port}`));
+createApp(dbPath, { passcode, secret, omdbKey: process.env.OMDB_API_KEY, tmdbToken: process.env.TMDB_TOKEN }).listen(port, () => console.log(`BackLog on :${port}`));

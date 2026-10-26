@@ -3,11 +3,12 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { authRoutes, readName } = require('./auth');
 const { createOmdb, UpstreamError } = require('./omdb');
+const { createTmdb } = require('./tmdb');
 
 const KINDS = ['movie', 'show'];
 const MAX_REVIEW = 5000;
 
-function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
+function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
   if (!passcode || !secret) throw new Error('passcode and secret are required');
   const db = new Database(dbPath);
   db.exec(`CREATE TABLE IF NOT EXISTS titles (
@@ -52,6 +53,7 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
   authRoutes(app, { passcode, secret });
 
   const omdb = omdbKey && createOmdb({ apiKey: omdbKey, fetch });
+  const tmdb = tmdbToken && createTmdb({ token: tmdbToken, fetch });
 
   app.get('/api/search', async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
@@ -77,9 +79,13 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
     if (!t || !t.imdb_id) return res.status(404).json({ error: 'No details for that title' });
     if (!omdb) return res.status(503).json({ error: 'Details are not configured' });
     try {
-      const d = await omdb.details(t.imdb_id);
+      // streaming info is a bonus: if TMDB fails, the rundown still loads
+      const [d, watch] = await Promise.all([
+        omdb.details(t.imdb_id),
+        tmdb ? tmdb.providers(t.imdb_id, t.kind).catch((e) => { console.error(e.message); return null; }) : null,
+      ]);
       if (!d) return res.status(404).json({ error: 'No details for that title' });
-      res.json(d);
+      res.json({ ...d, watch });
     } catch (e) {
       if (!(e instanceof UpstreamError)) throw e;
       console.error(e.message);

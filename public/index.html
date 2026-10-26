@@ -194,6 +194,13 @@ async function openInfo(t) {
       ['Ratings', [d.imdb_votes && t.imdb_rating ? `IMDb ${t.imdb_rating} (${d.imdb_votes} votes)` : '', ...d.ratings.filter((r) => r.source !== 'Internet Movie Database').map((r) => `${r.source} ${r.value}`)].filter(Boolean).join(' · ')]];
     for (const [k, v] of rows) if (v) facts.append(el('dt', { textContent: k }), el('dd', { textContent: v }));
     extra.remove();
+    if (d.watch) {
+      const line = (label, names) => names.length && el('div', {}, el('strong', { textContent: `${label}: ` }), names.join(', '));
+      plot.after(el('div', { className: 'watch' }, el('h3', { textContent: 'Where to watch (US)' }),
+        line('Stream', d.watch.stream) || '', line('Rent', d.watch.rent) || '', line('Buy', d.watch.buy) || '',
+        el('div', { className: 'sub' }, 'Data from TMDB, provided by ',
+          (d.watch.link ? el('a', { href: d.watch.link, target: '_blank', rel: 'noopener noreferrer', textContent: 'JustWatch' }) : 'JustWatch'))));
+    }
   } catch { extra.textContent = 'Could not load more details right now.'; }
 }
 

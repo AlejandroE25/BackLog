@@ -96,3 +96,5 @@ a { color: var(--accent); }
 a.btn { text-decoration: none; display: inline-block; }
 .row .btn.small { margin-top: 0; }
 .row { flex-wrap: wrap; align-items: center; }
+.watch { display: grid; gap: 4px; font-size: .9rem; }
+.watch h3 { margin: 0; font-size: .95rem; }

@@ -3,8 +3,8 @@
 See plan.md for assumptions and acceptance criteria.
 
 ## Before starting
-- [ ] Answer open questions in plan.md (ticket-queue app reference, OMDb vs TMDB, Azure subscription)
-- [ ] Get free OMDb API key
+- [x] Open questions answered
+- [x] OMDb API key
 
 ## Phase 1: Foundation, early deploy
 - [x] T1. Skeleton + add/list a title (Express, SQLite, tests)
@@ -21,5 +21,5 @@ See plan.md for assumptions and acceptance criteria.
 
 ## Phase 3: Finish
 - [x] T8. Delete permissions + UX polish (toasts, dark/light, a11y, XSS-safe)
-- [ ] T9. README + final live verification
-- [ ] **Checkpoint C**: tests green, live loop verified, README works
+- [x] T9. README + final live verification
+- [x] **Checkpoint C**: tests green, live loop verified, README works

@@ -34,6 +34,13 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
 
   app.get('/healthz', (req, res) => res.send('ok'));
 
+  // Public, read-only. Explicit column lists: never expose notes, who added what, or ids.
+  const PUBLIC = 'imdb_id, title, year, kind, poster_url, plot';
+  const publicQueue = db.prepare(`SELECT ${PUBLIC} FROM titles WHERE watched_at IS NULL ORDER BY id DESC`);
+  const publicWatched = db.prepare(`SELECT ${PUBLIC}, rating, review, watched_at FROM titles WHERE watched_at IS NOT NULL ORDER BY watched_at DESC, id DESC`);
+  app.get('/api/public', (req, res) => res.json({ queue: publicQueue.all(), watched: publicWatched.all() }));
+  app.get('/public', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'public.html')));
+
   authRoutes(app, { passcode, secret });
 
   const omdb = omdbKey && createOmdb({ apiKey: omdbKey, fetch });
@@ -112,6 +119,16 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
     db.prepare("UPDATE titles SET rating = ?, review = ?, watched_at = COALESCE(watched_at, datetime('now')) WHERE id = ?")
       .run(rating, review?.trim() || null, id);
     res.json(getTitle.get(id));
+  });
+
+  app.delete('/api/titles/:id', (req, res) => {
+    const id = Number(req.params.id);
+    const t = Number.isInteger(id) && getTitle.get(id);
+    if (!t) return res.status(404).json({ error: 'Title not found' });
+    const allowed = req.user === 'me' || (t.added_by === req.user && !t.watched_at);
+    if (!allowed) return res.status(403).json({ error: "You can only remove your own titles that aren't watched yet" });
+    db.prepare('DELETE FROM titles WHERE id = ?').run(id);
+    res.status(204).end();
   });
 
   return app;

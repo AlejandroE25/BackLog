@@ -20,6 +20,6 @@ See plan.md for assumptions and acceptance criteria.
 - [x] **Checkpoint B**: add → watch → review → friend reads, on live site (MVP)
 
 ## Phase 3: Finish
-- [ ] T8. Delete permissions + UX polish (toasts, dark/light, a11y, XSS-safe)
+- [x] T8. Delete permissions + UX polish (toasts, dark/light, a11y, XSS-safe)
 - [ ] T9. README + final live verification
 - [ ] **Checkpoint C**: tests green, live loop verified, README works

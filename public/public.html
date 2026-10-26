@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backlog: what I'm watching</title>
+<meta name="description" content="A shared watchlist and my reviews.">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Back<span>log</span></h1>
+    <a href="/">Sign in</a>
+  </header>
+  <p class="hero">Movies and shows on my list, and what I thought of the ones I've seen.</p>
+
+  <section id="watchedSection" hidden>
+    <h2 class="section">Watched &amp; reviewed</h2>
+    <ul id="watched" class="grid"></ul>
+  </section>
+
+  <section id="queueSection" hidden>
+    <h2 class="section">Up next</h2>
+    <ul id="list" class="grid"></ul>
+  </section>
+
+  <div id="empty" hidden><strong>Nothing here yet</strong>Check back soon.</div>
+  <p id="err" role="alert"></p>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+// textContent only, never innerHTML: titles and reviews are user text
+const el = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) k.includes('-') ? n.setAttribute(k, v) : (n[k] = v);
+  n.append(...kids);
+  return n;
+};
+function poster(t) {
+  const fallback = () => el('div', { className: 'poster noposter', textContent: t.title.trim().charAt(0).toUpperCase(), 'aria-hidden': 'true' });
+  if (!t.poster_url) return fallback();
+  const img = el('img', { className: 'poster', src: t.poster_url, alt: `Poster for ${t.title}`, loading: 'lazy', referrerPolicy: 'no-referrer' });
+  img.addEventListener('error', () => img.replaceWith(fallback()));
+  return img;
+}
+function card(t) {
+  const meta = [t.year, t.kind === 'show' ? 'Show' : 'Movie'].filter(Boolean).join(' · ');
+  const body = el('div', { className: 'body' }, el('div', { className: 'title', textContent: t.title }), el('div', { className: 'sub', textContent: meta }));
+  if (t.rating) {
+    body.append(el('div', { className: 'stars', role: 'img', 'aria-label': `${t.rating} out of 5`, textContent: '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) }));
+    if (t.review) body.append(el('div', { className: 'review', textContent: t.review }));
+  }
+  return el('li', { className: 'card' }, poster(t), body);
+}
+(async () => {
+  try {
+    const res = await fetch('/api/public');
+    if (!res.ok) throw new Error();
+    const { queue, watched } = await res.json();
+    $('watched').replaceChildren(...watched.map(card));
+    $('list').replaceChildren(...queue.map(card));
+    $('watchedSection').hidden = !watched.length;
+    $('queueSection').hidden = !queue.length;
+    $('empty').hidden = watched.length + queue.length > 0;
+  } catch { $('err').textContent = 'Could not load the list. Try again in a moment.'; }
+})();
+</script>
+</body>
+</html>

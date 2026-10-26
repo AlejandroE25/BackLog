@@ -5,6 +5,7 @@ const { authRoutes } = require('./auth');
 const { createOmdb, UpstreamError } = require('./omdb');
 
 const KINDS = ['movie', 'show'];
+const MAX_REVIEW = 5000;
 
 function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
   if (!passcode || !secret) throw new Error('passcode and secret are required');
@@ -96,6 +97,21 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
       .prepare('INSERT INTO titles (title, kind, note, added_by) VALUES (?, ?, ?, ?)')
       .run(title, kind, note, req.user);
     res.status(201).json(getTitle.get(lastInsertRowid));
+  });
+
+  app.patch('/api/titles/:id', (req, res) => {
+    if (req.user !== 'me') return res.status(403).json({ error: 'Only the owner can review' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || !getTitle.get(id)) return res.status(404).json({ error: 'Title not found' });
+    const { rating, review } = req.body;
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be 1 to 5' });
+    if (review !== undefined && (typeof review !== 'string' || review.length > MAX_REVIEW)) {
+      return res.status(400).json({ error: `Review must be text under ${MAX_REVIEW} characters` });
+    }
+    // watched_at is set on the first review only, so edits keep the original date
+    db.prepare("UPDATE titles SET rating = ?, review = ?, watched_at = COALESCE(watched_at, datetime('now')) WHERE id = ?")
+      .run(rating, review?.trim() || null, id);
+    res.json(getTitle.get(id));
   });
 
   return app;

@@ -59,6 +59,22 @@ h2.section { font-size: 1.1rem; margin: 0 0 14px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
+.btn.small { padding: 4px 12px; font-size: .85rem; margin-top: 6px; justify-self: start; }
+.stars { color: var(--accent); letter-spacing: 2px; }
+.review { font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+h2.section + .grid { margin-bottom: 36px; }
+dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); padding: 22px; width: min(92vw, 28rem); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgb(0 0 0 / .5); }
+dialog form { display: grid; gap: 12px; }
+dialog h2 { margin: 0; font-size: 1.1rem; }
+.rate { display: flex; gap: 6px; border: 0; padding: 0; margin: 0; }
+.rate legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
+.rate label { cursor: pointer; font-size: 2rem; line-height: 1; color: var(--line); }
+.rate input { position: absolute; opacity: 0; pointer-events: none; }
+.rate label.on { color: var(--accent); }
+.rate label:has(input:focus-visible) { outline: 3px solid var(--accent); border-radius: 6px; }
+textarea { width: 100%; min-height: 8rem; padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); resize: vertical; font: inherit; }
+.row { display: flex; gap: 8px; justify-content: flex-end; }
 #empty { text-align: center; padding: 48px 16px; color: var(--muted); }
 #empty strong { display: block; color: var(--text); font-size: 1.1rem; margin-bottom: 4px; }
 #err { color: #b91c1c; margin: 0; min-height: 1.4em; }
@@ -94,10 +110,35 @@ h2.section { font-size: 1.1rem; margin: 0 0 14px; }
       <p id="msg" role="status"></p>
     </div>
 
-    <h2 class="section">Up next</h2>
+    <h2 class="section" id="queueHeading">Up next</h2>
     <ul id="list" class="grid"></ul>
     <div id="empty" hidden><strong>Nothing in the queue yet</strong>Search above to add the first movie or show.</div>
+
+    <section id="watchedSection" hidden>
+      <h2 class="section">Watched</h2>
+      <ul id="watched" class="grid"></ul>
+    </section>
   </main>
+
+  <dialog id="review">
+    <form method="dialog" id="reviewForm">
+      <h2 id="reviewTitle"></h2>
+      <fieldset class="rate">
+        <legend>Rating</legend>
+        <label><input type="radio" name="rating" value="1" required>★</label>
+        <label><input type="radio" name="rating" value="2">★</label>
+        <label><input type="radio" name="rating" value="3">★</label>
+        <label><input type="radio" name="rating" value="4">★</label>
+        <label><input type="radio" name="rating" value="5">★</label>
+      </fieldset>
+      <textarea name="review" aria-label="Review" placeholder="What did you think?" maxlength="5000"></textarea>
+      <p id="reviewErr" role="alert"></p>
+      <div class="row">
+        <button class="btn" type="button" id="reviewCancel">Cancel</button>
+        <button class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -109,6 +150,7 @@ const el = (tag, props = {}, ...kids) => {
   return n;
 };
 const json = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+let me = null;
 const say = (m) => { $('msg').textContent = m; };
 
 async function init() {
@@ -116,7 +158,7 @@ async function init() {
   $('login').hidden = res.ok;
   $('app').hidden = !res.ok;
   $('who').hidden = !res.ok;
-  if (res.ok) { $('whoName').textContent = `Signed in as ${(await res.json()).name}`; load(); }
+  if (res.ok) { me = (await res.json()).name; $('whoName').textContent = `Signed in as ${me}`; load(); }
 }
 $('login').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -143,9 +185,47 @@ function card(t) {
   );
   if (t.imdb_rating) body.append(el('div', { className: 'sub', textContent: `★ ${t.imdb_rating} IMDb` }));
   body.append(el('div', {}, el('span', { className: 'chip', textContent: `added by ${t.added_by || 'unknown'}` })));
-  if (t.note) body.append(el('div', { className: 'note', textContent: `“${t.note}”` }));
+  if (t.watched_at) {
+    body.append(el('div', { className: 'stars', role: 'img', 'aria-label': `${t.rating} out of 5` , textContent: '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) }));
+    if (t.review) body.append(el('div', { className: 'review', textContent: t.review }));
+  } else if (t.note) {
+    body.append(el('div', { className: 'note', textContent: `“${t.note}”` }));
+  }
+  if (me === 'me') {
+    const b = el('button', { className: 'btn small', type: 'button', textContent: t.watched_at ? 'Edit review' : 'Mark watched' });
+    b.addEventListener('click', () => openReview(t));
+    body.append(b);
+  }
   return el('li', { className: 'card' }, poster(t), body);
 }
+
+// ---- review dialog (owner only; the server enforces this too) ----
+const dlg = $('review'), rf = $('reviewForm');
+let editing = null;
+function paintStars() {
+  const v = Number(rf.rating.value) || 0;
+  rf.querySelectorAll('.rate label').forEach((l, i) => l.classList.toggle('on', i < v));
+}
+rf.addEventListener('change', paintStars);
+function openReview(t) {
+  editing = t;
+  $('reviewTitle').textContent = t.title;
+  rf.reset();
+  if (t.rating) rf.rating.value = String(t.rating);
+  rf.review.value = t.review || '';
+  $('reviewErr').textContent = '';
+  paintStars();
+  dlg.showModal();
+}
+$('reviewCancel').addEventListener('click', () => dlg.close());
+rf.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const res = await fetch(`/api/titles/${editing.id}`, { ...json({ rating: Number(rf.rating.value), review: rf.review.value }), method: 'PATCH' });
+  if (res.status === 401) { dlg.close(); return init(); }
+  if (!res.ok) { $('reviewErr').textContent = (await res.json()).error; return; }
+  dlg.close();
+  load();
+});
 async function load() {
   const list = $('list');
   list.replaceChildren(...Array.from({ length: 6 }, () => el('li', { className: 'skeleton', 'aria-hidden': 'true' })));
@@ -153,8 +233,12 @@ async function load() {
   const res = await fetch('/api/titles');
   if (res.status === 401) return init();
   const titles = await res.json();
-  list.replaceChildren(...titles.map(card));
-  $('empty').hidden = titles.length > 0;
+  const queue = titles.filter((t) => !t.watched_at);
+  const done = titles.filter((t) => t.watched_at).sort((a, b) => b.watched_at.localeCompare(a.watched_at) || b.id - a.id);
+  list.replaceChildren(...queue.map(card));
+  $('empty').hidden = queue.length > 0;
+  $('watched').replaceChildren(...done.map(card));
+  $('watchedSection').hidden = done.length === 0;
 }
 
 // ---- search combobox ----

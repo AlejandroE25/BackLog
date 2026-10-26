@@ -16,8 +16,8 @@ See plan.md for assumptions and acceptance criteria.
 - [x] T4. IMDb search proxy (OMDb), cached, error-safe
 - [x] T5. Add-by-search UI with poster/name autofill, duplicate handling
 - [x] T6. Queue poster grid (responsive, skeletons, empty state)
-- [ ] T7. Mark watched + review (owner only) + Watched view
-- [ ] **Checkpoint B**: add → watch → review → friend reads, on live site (MVP)
+- [x] T7. Mark watched + review (owner only) + Watched view
+- [x] **Checkpoint B**: add → watch → review → friend reads, on live site (MVP)
 
 ## Phase 3: Finish
 - [ ] T8. Delete permissions + UX polish (toasts, dark/light, a11y, XSS-safe)

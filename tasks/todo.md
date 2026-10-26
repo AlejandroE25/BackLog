@@ -9,8 +9,8 @@ See plan.md for assumptions and acceptance criteria.
 ## Phase 1: Foundation, early deploy
 - [x] T1. Skeleton + add/list a title (Express, SQLite, tests)
 - [x] T2. Passcode gate + identity cookie, server-set `added_by`
-- [ ] T3. Azure App Service deploy of skeleton; data survives restart/redeploy
-- [ ] **Checkpoint A**: live site, both users log in and add
+- [x] T3. Azure App Service deploy of skeleton; data survives restart/redeploy
+- [x] **Checkpoint A**: live site, both users log in and add
 
 ## Phase 2: The nice part
 - [ ] T4. IMDb search proxy (OMDb), cached, error-safe

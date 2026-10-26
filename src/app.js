@@ -54,16 +54,48 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
     res.json(db.prepare('SELECT * FROM titles ORDER BY id DESC').all());
   });
 
-  app.post('/api/titles', (req, res) => {
+  const getTitle = db.prepare('SELECT * FROM titles WHERE id = ?');
+  const cleanNote = (n) => (typeof n === 'string' ? n.trim() || null : null);
+
+  app.post('/api/titles', async (req, res) => {
+    const { imdb_id: imdbId, kind } = req.body;
+    const note = cleanNote(req.body.note);
+
+    if (imdbId !== undefined) {
+      if (typeof imdbId !== 'string' || !/^tt\d{5,10}$/.test(imdbId)) return res.status(400).json({ error: 'Invalid IMDb id' });
+      if (db.prepare('SELECT 1 FROM titles WHERE imdb_id = ?').get(imdbId)) {
+        return res.status(409).json({ error: 'Already in the list' });
+      }
+      if (!omdb) return res.status(503).json({ error: 'Search is not configured' });
+      let d;
+      try {
+        d = await omdb.lookup(imdbId);
+      } catch (e) {
+        if (!(e instanceof UpstreamError)) throw e;
+        console.error(e.message);
+        return res.status(502).json({ error: 'IMDb lookup is unavailable right now' });
+      }
+      if (!d) return res.status(404).json({ error: 'Title not found' });
+      try {
+        const { lastInsertRowid } = db
+          .prepare(`INSERT INTO titles (imdb_id, title, year, kind, poster_url, plot, imdb_rating, note, added_by)
+                    VALUES (@imdb_id, @title, @year, @kind, @poster_url, @plot, @imdb_rating, @note, @added_by)`)
+          .run({ ...d, note, added_by: req.user });
+        return res.status(201).json(getTitle.get(lastInsertRowid));
+      } catch (e) {
+        // two people adding the same title at once: the UNIQUE index decides
+        if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ error: 'Already in the list' });
+        throw e;
+      }
+    }
+
     const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
-    const { kind } = req.body;
     if (!title) return res.status(400).json({ error: 'Title is required' });
     if (!KINDS.includes(kind)) return res.status(400).json({ error: 'Kind must be movie or show' });
-    const note = typeof req.body.note === 'string' ? req.body.note.trim() || null : null;
     const { lastInsertRowid } = db
       .prepare('INSERT INTO titles (title, kind, note, added_by) VALUES (?, ?, ?, ?)')
       .run(title, kind, note, req.user);
-    res.status(201).json(db.prepare('SELECT * FROM titles WHERE id = ?').get(lastInsertRowid));
+    res.status(201).json(getTitle.get(lastInsertRowid));
   });
 
   return app;

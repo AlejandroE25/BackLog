@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Backlog</title>
+<style>
+.combo { position: relative; max-width: 28rem; }
+.combo input { width: 100%; box-sizing: border-box; }
+#results { position: absolute; z-index: 5; left: 0; right: 0; margin: 0; padding: 0; list-style: none; background: Canvas; color: CanvasText; border: 1px solid; max-height: 22rem; overflow: auto; }
+#results li { display: flex; gap: .75rem; align-items: center; padding: .4rem .6rem; cursor: pointer; }
+#results li[aria-selected="true"], #results li:hover { background: Highlight; color: HighlightText; }
+#results img, #results .noposter { width: 40px; height: 60px; object-fit: cover; flex: none; background: GrayText; }
+</style>
 </head>
 <body>
 <h1>Backlog</h1>
@@ -15,12 +23,15 @@
 </form>
 <main id="app" hidden>
 <p><span id="who"></span> <button id="logout" type="button">Log out</button></p>
-<form id="add">
-  <input name="title" placeholder="Title" required>
-  <select name="kind"><option value="movie">Movie</option><option value="show">Show</option></select>
-  <button>Add</button>
-  <p id="err" role="alert"></p>
-</form>
+<div id="add">
+  <label for="q">Add a movie or show</label>
+  <div class="combo">
+    <input id="q" role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list" autocomplete="off" placeholder="Search IMDb…">
+    <ul id="results" role="listbox" hidden></ul>
+  </div>
+  <input id="note" placeholder="Why should it be watched? (optional)" maxlength="300">
+  <p id="err" role="status"></p>
+</div>
 <ul id="list"></ul>
 </main>
 <script>
@@ -48,20 +59,68 @@ async function load() {
   const titles = await (await fetch('/api/titles')).json();
   list.replaceChildren(...titles.map((t) => {
     const li = document.createElement('li');
-    li.textContent = `${t.title} (${t.kind}) added by ${t.added_by}`;
+    li.textContent = `${t.title}${t.year ? ` (${t.year})` : ''} · ${t.kind} · added by ${t.added_by}${t.note ? ` — ${t.note}` : ''}`;
     return li;
   }));
 }
-document.getElementById('add').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const f = e.target;
+
+const q = $('q'), results = $('results');
+let hits = [], active = -1, timer, ctrl;
+const say = (msg) => { err.textContent = msg; };
+function close() { results.hidden = true; q.setAttribute('aria-expanded', 'false'); q.removeAttribute('aria-activedescendant'); active = -1; }
+function highlight(i) {
+  active = i;
+  [...results.children].forEach((li, n) => li.setAttribute('aria-selected', n === i));
+  if (i >= 0) q.setAttribute('aria-activedescendant', `opt${i}`); else q.removeAttribute('aria-activedescendant');
+}
+function render() {
+  results.replaceChildren(...hits.map((h, i) => {
+    const li = document.createElement('li');
+    li.id = `opt${i}`; li.role = 'option';
+    const art = h.poster_url ? Object.assign(document.createElement('img'), { src: h.poster_url, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' }) : Object.assign(document.createElement('span'), { className: 'noposter' });
+    const text = document.createElement('span');
+    text.textContent = `${h.title} (${h.year}) · ${h.kind}`;
+    li.append(art, text);
+    li.addEventListener('mousedown', (e) => { e.preventDefault(); pick(i); });
+    return li;
+  }));
+  results.hidden = !hits.length;
+  q.setAttribute('aria-expanded', String(hits.length > 0));
+  highlight(-1);
+}
+async function search() {
+  const term = q.value.trim();
+  if (term.length < 2) { hits = []; render(); return; }
+  ctrl?.abort(); ctrl = new AbortController();
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { signal: ctrl.signal });
+    if (res.status === 401) return init();
+    if (!res.ok) { say((await res.json()).error); return; }
+    hits = await res.json();
+    say(hits.length ? '' : 'No matches');
+    render();
+  } catch (e) { if (e.name !== 'AbortError') say('Search failed'); }
+}
+async function pick(i) {
+  const h = hits[i];
+  close();
+  say(`Adding ${h.title}…`);
   const res = await fetch('/api/titles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: f.title.value, kind: f.kind.value }),
+    body: JSON.stringify({ imdb_id: h.imdb_id, note: $('note').value }),
   });
-  err.textContent = res.ok ? '' : (await res.json()).error;
-  if (res.ok) { f.reset(); load(); }
+  if (res.status === 401) return init();
+  say(res.ok ? `Added ${h.title}` : (await res.json()).error);
+  if (res.ok) { q.value = ''; $('note').value = ''; hits = []; load(); }
+}
+q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 250); });
+q.addEventListener('blur', close);
+q.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' && hits.length) { e.preventDefault(); if (results.hidden) render(); highlight((active + 1) % hits.length); }
+  else if (e.key === 'ArrowUp' && hits.length) { e.preventDefault(); highlight((active - 1 + hits.length) % hits.length); }
+  else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); pick(active); }
+  else if (e.key === 'Escape') close();
 });
 init();
 </script>

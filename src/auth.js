@@ -44,4 +44,4 @@ function authRoutes(app, { passcode, secret }) {
   app.get('/api/me', (req, res) => res.json({ name: req.user }));
 }
 
-module.exports = { authRoutes };
+module.exports = { authRoutes, readName };

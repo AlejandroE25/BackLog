@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Backlog</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#ea580c">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -22,7 +26,7 @@
     <select name="name" aria-label="Who are you"><option value="me">I'm me</option><option value="friend">I'm friend</option></select>
     <button class="btn primary">Enter</button>
     <p id="err" role="alert"></p>
-    <a href="/public">Just curious? See what I'm watching →</a>
+    <a href="/">← Back to the public page</a>
   </form>
 
   <main id="app" hidden>
@@ -109,9 +113,9 @@ $('login').addEventListener('submit', async (e) => {
   const f = e.target;
   const res = await fetch('/api/login', json({ passcode: f.passcode.value, name: f.name.value }));
   $('err').textContent = res.ok ? '' : (await res.json()).error;
-  if (res.ok) { f.reset(); init(); }
+  if (res.ok) location.assign('/');
 });
-$('logout').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); init(); });
+$('logout').addEventListener('click', async () => { await fetch('/api/logout', { method: 'POST' }); location.assign('/'); });
 
 // ---- queue grid ----
 function poster(t) {

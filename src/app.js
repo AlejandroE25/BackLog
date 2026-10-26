@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { authRoutes } = require('./auth');
+const { authRoutes, readName } = require('./auth');
 const { createOmdb, UpstreamError } = require('./omdb');
 
 const KINDS = ['movie', 'show'];
@@ -30,7 +30,15 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
   const app = express();
   app.set('trust proxy', 1); // Azure terminates TLS in front of us
   app.use(express.json());
-  app.use(express.static(path.join(__dirname, '..', 'public')));
+  const page = (name) => path.join(__dirname, '..', 'public', name);
+
+  // Visitors see the public page; the app only once signed in. Same URL, so never cache it.
+  app.get('/', (req, res) => {
+    res.set({ Vary: 'Cookie', 'Cache-Control': 'no-cache' });
+    res.sendFile(page(readName(req, secret) ? 'index.html' : 'public.html'));
+  });
+  app.get('/login', (req, res) => res.sendFile(page('index.html')));
+  app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
   app.get('/healthz', (req, res) => res.send('ok'));
 
@@ -39,7 +47,7 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
   const publicQueue = db.prepare(`SELECT ${PUBLIC} FROM titles WHERE watched_at IS NULL ORDER BY id DESC`);
   const publicWatched = db.prepare(`SELECT ${PUBLIC}, rating, review, watched_at FROM titles WHERE watched_at IS NOT NULL ORDER BY watched_at DESC, id DESC`);
   app.get('/api/public', (req, res) => res.json({ queue: publicQueue.all(), watched: publicWatched.all() }));
-  app.get('/public', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'public.html')));
+  app.get('/public', (req, res) => res.sendFile(page('public.html')));
 
   authRoutes(app, { passcode, secret });
 

@@ -1,15 +1,15 @@
 # Backlog
 
-A small shared watchlist for two people. Search IMDb data (via OMDb) to add a movie or show with its poster, year, plot and rating filled in. The owner marks titles watched and writes a rating and review; the friend can read them. A read-only page at `/public` is open to anyone.
+A small shared watchlist for two people. Search IMDb data (via OMDb) to add a movie or show with its poster, year, plot and rating filled in. The owner marks titles watched and writes a rating and review; the friend can read them. Anyone who isn't signed in sees a read-only public page at `/`; sign in at `/login`.
 
-Live: https://backlog-ae42.azurewebsites.net (public page: `/public`)
+Live: https://backlog-ae42.azurewebsites.net
 
 ## How it works
 
 - **Two people, no accounts.** One shared passcode, then pick "me" (owner) or "friend". The choice is stored in a signed, HttpOnly cookie.
 - **Owner** (`me`): add, mark watched, rate 1–5, write or edit a review, remove anything.
 - **Friend**: add titles, remove their own unwatched titles, read reviews.
-- **Public** (`/public`, `GET /api/public`): posters, titles, years, ratings and reviews only. Notes and who-added-what are never exposed.
+- **Public** (`/` when signed out, always at `/public`; data from `GET /api/public`): posters, titles, years, ratings and reviews only. Notes and who-added-what are never exposed.
 - Node 22 + Express, SQLite (`better-sqlite3`), plain HTML/CSS/JS with no build step.
 
 ## Run locally

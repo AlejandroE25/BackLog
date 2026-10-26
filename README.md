@@ -1,4 +1,4 @@
-# Backlog
+# BackLog
 
 A small shared watchlist for two people. Search IMDb data (via OMDb) to add a movie or show with its poster, year, plot and rating filled in. The owner marks titles watched and writes a rating and review; the friend can read them. Anyone who isn't signed in sees a read-only public page at `/`; sign in at `/login`.
 

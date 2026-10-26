@@ -54,7 +54,24 @@ function createOmdb({ apiKey, fetch = globalThis.fetch }) {
     };
   }
 
-  return { search, lookup };
+  // Long-form IMDb rundown for one title, cached like search.
+  async function details(imdbId) {
+    const hit = cache.get(imdbId);
+    if (hit && hit.exp > Date.now()) return hit.value;
+    const d = await call({ i: imdbId, plot: 'full' }, 'Incorrect IMDb ID.');
+    if (d.Response === 'False') return null;
+    const val = (v) => (v && v !== 'N/A' ? v : null);
+    const value = {
+      imdb_id: d.imdbID, plot: val(d.Plot), rated: val(d.Rated), runtime: val(d.Runtime), genre: val(d.Genre),
+      director: val(d.Director), actors: val(d.Actors), awards: val(d.Awards), imdb_votes: val(d.imdbVotes),
+      ratings: (d.Ratings || []).map((r) => ({ source: r.Source, value: r.Value })),
+    };
+    if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value);
+    cache.set(imdbId, { value, exp: Date.now() + TTL_MS });
+    return value;
+  }
+
+  return { search, lookup, details };
 }
 
 module.exports = { createOmdb, UpstreamError };

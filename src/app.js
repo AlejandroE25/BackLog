@@ -71,6 +71,21 @@ function createApp(dbPath, { passcode, secret, omdbKey, fetch }) {
   });
 
   const getTitle = db.prepare('SELECT * FROM titles WHERE id = ?');
+
+  app.get('/api/titles/:id/details', async (req, res) => {
+    const t = getTitle.get(req.params.id);
+    if (!t || !t.imdb_id) return res.status(404).json({ error: 'No details for that title' });
+    if (!omdb) return res.status(503).json({ error: 'Details are not configured' });
+    try {
+      const d = await omdb.details(t.imdb_id);
+      if (!d) return res.status(404).json({ error: 'No details for that title' });
+      res.json(d);
+    } catch (e) {
+      if (!(e instanceof UpstreamError)) throw e;
+      console.error(e.message);
+      res.status(502).json({ error: 'Details are unavailable right now' });
+    }
+  });
   const cleanNote = (n) => (typeof n === 'string' ? n.trim() || null : null);
 
   app.post('/api/titles', async (req, res) => {

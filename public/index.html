@@ -52,6 +52,11 @@
 
   <div id="toasts" role="status" aria-live="polite"></div>
 
+  <dialog id="info">
+    <div id="infoBody" class="info"></div>
+    <div class="row" id="infoActions"><button class="btn primary" type="button" id="infoClose">Close</button></div>
+  </dialog>
+
   <dialog id="confirm">
     <form method="dialog" id="confirmForm">
       <h2 id="confirmTitle"></h2>
@@ -128,7 +133,7 @@ function poster(t) {
 function card(t) {
   const meta = [t.year, t.kind === 'show' ? 'Show' : 'Movie'].filter(Boolean).join(' · ');
   const body = el('div', { className: 'body' },
-    el('div', { className: 'title', textContent: t.title }),
+    el('button', { className: 'title linklike', type: 'button', textContent: t.title, onclick: () => openInfo(t) }),
     el('div', { className: 'sub', textContent: meta }),
   );
   if (t.imdb_rating) body.append(el('div', { className: 'sub', textContent: `★ ${t.imdb_rating} IMDb` }));
@@ -152,7 +157,44 @@ function card(t) {
     actions.append(b);
   }
   if (actions.children.length) body.append(actions);
-  return el('li', { className: 'card' }, poster(t), body);
+  const p = poster(t);
+  p.addEventListener('click', () => openInfo(t));
+  p.style.cursor = 'pointer';
+  return el('li', { className: 'card' }, p, body);
+}
+
+// ---- title info: stored basics instantly, full IMDb rundown fetched on open ----
+const idlg = $('info');
+$('infoClose').addEventListener('click', () => idlg.close());
+idlg.addEventListener('click', (e) => { if (e.target === idlg) idlg.close(); });
+async function openInfo(t) {
+  const body = $('infoBody');
+  const facts = el('dl', { className: 'facts' });
+  const extra = el('p', { className: 'sub', textContent: t.imdb_id ? 'Loading the IMDb rundown…' : '' });
+  const plot = el('p', { textContent: t.plot || '' });
+  const meta = [t.year, t.kind === 'show' ? 'Show' : 'Movie'].filter(Boolean).join(' · ');
+  body.replaceChildren(
+    el('div', { className: 'info-head' }, poster(t), el('div', {},
+      el('h2', { textContent: t.title }), el('div', { className: 'sub', textContent: meta }),
+      t.imdb_rating ? el('div', { className: 'sub', textContent: `★ ${t.imdb_rating} IMDb` }) : '')),
+    plot, facts, extra);
+  const links = $('infoActions');
+  links.querySelectorAll('a').forEach((a) => a.remove());
+  if (t.imdb_id) links.prepend(el('a', { className: 'btn small', href: `https://www.imdb.com/title/${encodeURIComponent(t.imdb_id)}/`, target: '_blank', rel: 'noopener noreferrer', textContent: 'Open on IMDb' }));
+  links.prepend(el('a', { className: 'btn small', href: `https://www.justwatch.com/us/search?q=${encodeURIComponent(t.title)}`, target: '_blank', rel: 'noopener noreferrer', textContent: 'Where to watch' }));
+  idlg.showModal();
+  if (!t.imdb_id) return;
+  try {
+    const res = await fetch(`/api/titles/${t.id}/details`);
+    if (res.status === 401) { idlg.close(); return init(); }
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    if (d.plot) plot.textContent = d.plot;
+    const rows = [['Rated', d.rated], ['Runtime', d.runtime], ['Genre', d.genre], ['Director', d.director], ['Cast', d.actors], ['Awards', d.awards],
+      ['Ratings', [d.imdb_votes && t.imdb_rating ? `IMDb ${t.imdb_rating} (${d.imdb_votes} votes)` : '', ...d.ratings.filter((r) => r.source !== 'Internet Movie Database').map((r) => `${r.source} ${r.value}`)].filter(Boolean).join(' · ')]];
+    for (const [k, v] of rows) if (v) facts.append(el('dt', { textContent: k }), el('dd', { textContent: v }));
+    extra.remove();
+  } catch { extra.textContent = 'Could not load more details right now.'; }
 }
 
 // ---- remove (confirm first) ----

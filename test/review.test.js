@@ -1,5 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
+const request = require('supertest');
 const { app, login } = require('./helpers');
 
 async function withTitle() {
@@ -7,8 +8,25 @@ async function withTitle() {
   const friend = await login(a, 'friend');
   const me = await login(a, 'me');
   const { body } = await friend.post('/api/titles').send({ title: 'Dune', kind: 'movie' });
-  return { friend, me, id: body.id };
+  return { a, friend, me, id: body.id };
 }
+
+test('owner can mark a title in progress and it shows in public results', async () => {
+  const { a, me, id } = await withTitle();
+  const res = await me.patch(`/api/titles/${id}`).send({ in_progress: true });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.body.in_progress, 1);
+
+  const publicRes = await request(a).get('/api/public');
+  assert.strictEqual(publicRes.status, 200);
+  assert.strictEqual(publicRes.body.inProgress.length, 1);
+  assert.strictEqual(publicRes.body.inProgress[0].title, 'Dune');
+  assert.strictEqual(publicRes.body.queue.length, 0);
+
+  const backToQueue = await me.patch(`/api/titles/${id}`).send({ in_progress: false });
+  assert.strictEqual(backToQueue.status, 200);
+  assert.strictEqual(backToQueue.body.in_progress, 0);
+});
 
 test('owner marks watched with rating and review', async () => {
   const { me, id } = await withTitle();

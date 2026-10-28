@@ -40,6 +40,11 @@
       <p id="msg" role="status"></p>
     </div>
 
+    <section id="inProgressSection">
+      <h2 class = "section">In Progress</h2>
+      <ul id="inProgress" class="grid"></ul>
+    </section>
+
     <h2 class="section" id="queueHeading">Up next</h2>
     <ul id="list" class="grid"></ul>
     <div id="empty" hidden><strong>Nothing in the queue yet</strong>Search above to add the first movie or show.</div>
@@ -145,13 +150,19 @@ function card(t) {
     body.append(el('div', { className: 'note', textContent: `“${t.note}”` }));
   }
   const actions = el('div', { className: 'actions' });
+  const canManage = me === 'me' || (t.added_by === me && !t.watched_at);
   if (me === 'me') {
     const b = el('button', { className: 'btn small', type: 'button', textContent: t.watched_at ? 'Edit review' : 'Mark watched' });
     b.addEventListener('click', () => openReview(t));
     actions.append(b);
   }
+  if (!t.watched_at && canManage) {
+    const b = el('button', { className: 'btn small', type: 'button', textContent: t.in_progress ? 'Move to up next' : 'Mark in progress' });
+    b.addEventListener('click', () => setInProgress(t, !t.in_progress));
+    actions.append(b);
+  }
   // mirrors the server rule: owner removes anything, friend only their own unwatched titles
-  if (me === 'me' || (t.added_by === me && !t.watched_at)) {
+  if (canManage) {
     const b = el('button', { className: 'btn small danger', type: 'button', textContent: 'Remove', 'aria-label': `Remove ${t.title}` });
     b.addEventListener('click', () => askRemove(t));
     actions.append(b);
@@ -252,17 +263,29 @@ rf.addEventListener('submit', async (e) => {
   toast('Review saved');
   load();
 });
+async function setInProgress(t, inProgress) {
+  const res = await fetch(`/api/titles/${t.id}`, { ...json({ in_progress: !!inProgress }), method: 'PATCH' });
+  if (res.status === 401) return init();
+  if (!res.ok) return toast((await res.json()).error, true);
+  toast(inProgress ? `Marked ${t.title} in progress` : `Moved ${t.title} to up next`);
+  load();
+}
 async function load() {
   const list = $('list');
+  const inProgress = $('inProgress');
   list.replaceChildren(...Array.from({ length: 6 }, () => el('li', { className: 'skeleton', 'aria-hidden': 'true' })));
+  inProgress.replaceChildren(...Array.from({ length: 3 }, () => el('li', { className: 'skeleton', 'aria-hidden': 'true' })));
   $('empty').hidden = true;
   const res = await fetch('/api/titles');
   if (res.status === 401) return init();
   const titles = await res.json();
-  const queue = titles.filter((t) => !t.watched_at);
+  const active = titles.filter((t) => !t.watched_at && t.in_progress);
+  const queue = titles.filter((t) => !t.watched_at && !t.in_progress);
   const done = titles.filter((t) => t.watched_at).sort((a, b) => b.watched_at.localeCompare(a.watched_at) || b.id - a.id);
+  inProgress.replaceChildren(...active.map(card));
   list.replaceChildren(...queue.map(card));
-  $('empty').hidden = queue.length > 0;
+  $('empty').hidden = queue.length + active.length + done.length > 0;
+  $('inProgressSection').hidden = active.length === 0;
   $('watched').replaceChildren(...done.map(card));
   $('watchedSection').hidden = done.length === 0;
 }

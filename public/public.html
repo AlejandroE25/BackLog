@@ -19,14 +19,19 @@
   </header>
   <p class="hero">Movies and shows on my list, and what I thought of the ones I've seen.</p>
 
-  <section id="watchedSection" hidden>
-    <h2 class="section">Watched &amp; reviewed</h2>
-    <ul id="watched" class="grid"></ul>
+  <section id="inProgressSection">
+    <h2 class = "section">In Progress</h2>
+    <ul id="inProgress" class="grid"></ul>
   </section>
 
   <section id="queueSection" hidden>
     <h2 class="section">Up next</h2>
     <ul id="list" class="grid"></ul>
+  </section>
+
+  <section id="watchedSection" hidden>
+    <h2 class="section">Watched &amp; reviewed</h2>
+    <ul id="watched" class="grid"></ul>
   </section>
 
   <div id="empty" hidden><strong>Nothing here yet</strong>Check back soon.</div>
@@ -61,12 +66,14 @@ function card(t) {
   try {
     const res = await fetch('/api/public');
     if (!res.ok) throw new Error();
-    const { queue, watched } = await res.json();
+    const { inProgress, queue, watched } = await res.json();
+    $('inProgress').replaceChildren(...inProgress.map(card));
     $('watched').replaceChildren(...watched.map(card));
     $('list').replaceChildren(...queue.map(card));
+    $('inProgressSection').hidden = !inProgress.length;
     $('watchedSection').hidden = !watched.length;
     $('queueSection').hidden = !queue.length;
-    $('empty').hidden = watched.length + queue.length > 0;
+    $('empty').hidden = watched.length + queue.length + inProgress.length > 0;
   } catch { $('err').textContent = 'Could not load the list. Try again in a moment.'; }
 })();
 </script>

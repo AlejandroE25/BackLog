@@ -38,5 +38,5 @@ test('public page is served, and the private API is still locked', async () => {
 
 test('empty list gives empty arrays', async () => {
   const res = await request(app()).get('/api/public');
-  assert.deepStrictEqual(res.body, { queue: [], watched: [] });
+  assert.deepStrictEqual(res.body, { inProgress: [], queue: [], watched: [] });
 });

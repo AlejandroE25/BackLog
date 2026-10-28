@@ -25,8 +25,11 @@ function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
     added_at TEXT NOT NULL DEFAULT (datetime('now')),
     watched_at TEXT,
     rating INTEGER CHECK (rating BETWEEN 1 AND 5),
-    review TEXT
+    review TEXT,
+    in_progress INTEGER NOT NULL DEFAULT 0 CHECK (in_progress IN (0, 1))
   )`);
+  const hasInProgress = db.prepare('PRAGMA table_info(titles)').all().some((column) => column.name === 'in_progress');
+  if (!hasInProgress) db.exec('ALTER TABLE titles ADD COLUMN in_progress INTEGER NOT NULL DEFAULT 0 CHECK (in_progress IN (0, 1))');
 
   const app = express();
   app.set('trust proxy', 1); // Azure terminates TLS in front of us
@@ -45,9 +48,10 @@ function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
 
   // Public, read-only. Explicit column lists: never expose notes, who added what, or ids.
   const PUBLIC = 'imdb_id, title, year, kind, poster_url, plot';
-  const publicQueue = db.prepare(`SELECT ${PUBLIC} FROM titles WHERE watched_at IS NULL ORDER BY id DESC`);
+  const publicInProgress = db.prepare(`SELECT ${PUBLIC} FROM titles WHERE watched_at IS NULL AND in_progress = 1 ORDER BY id DESC`);
+  const publicQueue = db.prepare(`SELECT ${PUBLIC} FROM titles WHERE watched_at IS NULL AND in_progress = 0 ORDER BY id DESC`);
   const publicWatched = db.prepare(`SELECT ${PUBLIC}, rating, review, watched_at FROM titles WHERE watched_at IS NOT NULL ORDER BY watched_at DESC, id DESC`);
-  app.get('/api/public', (req, res) => res.json({ queue: publicQueue.all(), watched: publicWatched.all() }));
+  app.get('/api/public', (req, res) => res.json({ inProgress: publicInProgress.all(), queue: publicQueue.all(), watched: publicWatched.all() }));
   app.get('/public', (req, res) => res.sendFile(page('public.html')));
 
   authRoutes(app, { passcode, secret });
@@ -136,17 +140,46 @@ function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
   });
 
   app.patch('/api/titles/:id', (req, res) => {
-    if (req.user !== 'me') return res.status(403).json({ error: 'Only the owner can review' });
     const id = Number(req.params.id);
-    if (!Number.isInteger(id) || !getTitle.get(id)) return res.status(404).json({ error: 'Title not found' });
-    const { rating, review } = req.body;
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be 1 to 5' });
-    if (review !== undefined && (typeof review !== 'string' || review.length > MAX_REVIEW)) {
+    const t = Number.isInteger(id) && getTitle.get(id);
+    if (!t) return res.status(404).json({ error: 'Title not found' });
+
+    const canManage = req.user === 'me' || t.added_by === req.user;
+    if (!canManage) return res.status(403).json({ error: 'Only the owner can review or update progress' });
+
+    const { rating, review, in_progress: inProgress } = req.body;
+    const hasRating = Object.prototype.hasOwnProperty.call(req.body, 'rating');
+    const hasReview = Object.prototype.hasOwnProperty.call(req.body, 'review');
+    const hasProgress = Object.prototype.hasOwnProperty.call(req.body, 'in_progress');
+
+    if (inProgress !== undefined) {
+      if (t.watched_at) return res.status(400).json({ error: 'Watched titles cannot change progress' });
+      const value = typeof inProgress === 'boolean' ? Number(inProgress) : inProgress;
+      if (!Number.isInteger(value) || (value !== 0 && value !== 1)) {
+        return res.status(400).json({ error: 'Progress must be true or false' });
+      }
+      db.prepare('UPDATE titles SET in_progress = ? WHERE id = ?').run(value, id);
+    }
+
+    if (req.user !== 'me') {
+      if (hasRating || hasReview) return res.status(403).json({ error: 'Only the owner can review' });
+      return res.json(getTitle.get(id));
+    }
+
+    if (hasRating && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+      return res.status(400).json({ error: 'Rating must be 1 to 5' });
+    }
+    if (hasReview && (typeof review !== 'string' || review.length > MAX_REVIEW)) {
       return res.status(400).json({ error: `Review must be text under ${MAX_REVIEW} characters` });
     }
-    // watched_at is set on the first review only, so edits keep the original date
-    db.prepare("UPDATE titles SET rating = ?, review = ?, watched_at = COALESCE(watched_at, datetime('now')) WHERE id = ?")
-      .run(rating, review?.trim() || null, id);
+    if (!hasRating && !hasReview && !hasProgress && Object.keys(req.body).length === 0) {
+      return res.status(400).json({ error: 'Provide a rating or review' });
+    }
+    if (hasRating || hasReview) {
+      // watched_at is set on the first review only, so edits keep the original date
+      db.prepare("UPDATE titles SET rating = ?, review = ?, watched_at = COALESCE(watched_at, datetime('now')) WHERE id = ?")
+        .run(rating ?? t.rating ?? null, review?.trim() || null, id);
+    }
     res.json(getTitle.get(id));
   });
 

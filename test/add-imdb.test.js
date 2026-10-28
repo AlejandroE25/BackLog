@@ -19,7 +19,7 @@ test('adding by imdb_id fills details from OMDb, not from the client', async () 
     {
       id: undefined, imdb_id: 'tt1160419', title: 'Dune', year: '2021', kind: 'movie',
       poster_url: 'https://img/dune.jpg', plot: 'Spice.', imdb_rating: '8.0', note: 'for movie night',
-      added_by: 'friend', added_at: undefined, watched_at: null, rating: null, review: null,
+      added_by: 'friend', added_at: undefined, watched_at: null, rating: null, review: null, in_progress: 0,
     },
   );
 });

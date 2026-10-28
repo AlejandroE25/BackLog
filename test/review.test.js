@@ -85,30 +85,3 @@ test('only rating/review are writable', async () => {
   assert.strictEqual(res.body.title, 'Dune');
   assert.strictEqual(res.body.added_by, 'friend');
 });
-
-test('owner can mark an in-progress title watched with no rating', async () => {
-  const { a, me, id } = await withTitle();
-  await me.patch(`/api/titles/${id}`).send({ in_progress: true });
-  const res = await me.patch(`/api/titles/${id}`).send({ watched: true });
-  assert.strictEqual(res.status, 200);
-  assert.ok(res.body.watched_at);
-  assert.strictEqual(res.body.rating, null);
-  const pub = (await request(a).get('/api/public')).body;
-  assert.strictEqual(pub.inProgress.length, 0);
-  assert.strictEqual(pub.watched.length, 1);
-});
-
-test('a review without a rating marks watched; later edits keep what was not sent', async () => {
-  const { me, id } = await withTitle();
-  const first = (await me.patch(`/api/titles/${id}`).send({ review: 'slow but good' })).body;
-  assert.ok(first.watched_at);
-  assert.strictEqual(first.rating, null);
-  const rated = (await me.patch(`/api/titles/${id}`).send({ rating: 4 })).body;
-  assert.strictEqual(rated.review, 'slow but good');
-  assert.strictEqual(rated.rating, 4);
-});
-
-test('friend cannot mark watched', async () => {
-  const { friend, id } = await withTitle();
-  assert.strictEqual((await friend.patch(`/api/titles/${id}`).send({ watched: true })).status, 403);
-});

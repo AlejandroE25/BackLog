@@ -161,9 +161,8 @@ function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
       db.prepare('UPDATE titles SET in_progress = ? WHERE id = ?').run(value, id);
     }
 
-    const markWatched = req.body.watched === true;
     if (req.user !== 'me') {
-      if (hasRating || hasReview || markWatched) return res.status(403).json({ error: 'Only the owner can review' });
+      if (hasRating || hasReview) return res.status(403).json({ error: 'Only the owner can review' });
       return res.json(getTitle.get(id));
     }
 
@@ -173,13 +172,13 @@ function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
     if (hasReview && (typeof review !== 'string' || review.length > MAX_REVIEW)) {
       return res.status(400).json({ error: `Review must be text under ${MAX_REVIEW} characters` });
     }
-    if (!hasRating && !hasReview && !hasProgress && !markWatched) {
+    if (!hasRating && !hasReview && !hasProgress && Object.keys(req.body).length === 0) {
       return res.status(400).json({ error: 'Provide a rating or review' });
     }
-    if (hasRating || hasReview || markWatched) {
-      // watched_at is set once, so edits keep the original date; rating and review are both optional
+    if (hasRating || hasReview) {
+      // watched_at is set on the first review only, so edits keep the original date
       db.prepare("UPDATE titles SET rating = ?, review = ?, watched_at = COALESCE(watched_at, datetime('now')) WHERE id = ?")
-        .run(hasRating ? rating : t.rating, hasReview ? review.trim() || null : t.review, id);
+        .run(rating ?? t.rating ?? null, review?.trim() || null, id);
     }
     res.json(getTitle.get(id));
   });

@@ -56,8 +56,8 @@ function poster(t) {
 function card(t) {
   const meta = [t.year, t.kind === 'show' ? 'Show' : 'Movie'].filter(Boolean).join(' · ');
   const body = el('div', { className: 'body' }, el('div', { className: 'title', textContent: t.title }), el('div', { className: 'sub', textContent: meta }));
-  if (t.watched_at) {
-    if (t.rating) body.append(el('div', { className: 'stars', role: 'img', 'aria-label': `${t.rating} out of 5`, textContent: '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) }));
+  if (t.rating) {
+    body.append(el('div', { className: 'stars', role: 'img', 'aria-label': `${t.rating} out of 5`, textContent: '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) }));
     if (t.review) body.append(el('div', { className: 'review', textContent: t.review }));
   }
   return el('li', { className: 'card' }, poster(t), body);

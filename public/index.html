@@ -77,8 +77,8 @@
     <form method="dialog" id="reviewForm">
       <h2 id="reviewTitle"></h2>
       <fieldset class="rate">
-        <legend>Rating (optional)</legend>
-        <label><input type="radio" name="rating" value="1">★</label>
+        <legend>Rating</legend>
+        <label><input type="radio" name="rating" value="1" required>★</label>
         <label><input type="radio" name="rating" value="2">★</label>
         <label><input type="radio" name="rating" value="3">★</label>
         <label><input type="radio" name="rating" value="4">★</label>
@@ -144,7 +144,7 @@ function card(t) {
   if (t.imdb_rating) body.append(el('div', { className: 'sub', textContent: `★ ${t.imdb_rating} IMDb` }));
   body.append(el('div', {}, el('span', { className: 'chip', textContent: `added by ${t.added_by || 'unknown'}` })));
   if (t.watched_at) {
-    if (t.rating) body.append(el('div', { className: 'stars', role: 'img', 'aria-label': `${t.rating} out of 5` , textContent: '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) }));
+    body.append(el('div', { className: 'stars', role: 'img', 'aria-label': `${t.rating} out of 5` , textContent: '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) }));
     if (t.review) body.append(el('div', { className: 'review', textContent: t.review }));
   } else if (t.note) {
     body.append(el('div', { className: 'note', textContent: `“${t.note}”` }));
@@ -256,7 +256,7 @@ function openReview(t) {
 $('reviewCancel').addEventListener('click', () => dlg.close());
 rf.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const res = await fetch(`/api/titles/${editing.id}`, { ...json({ watched: true, review: rf.review.value, ...(rf.rating.value && { rating: Number(rf.rating.value) }) }), method: 'PATCH' });
+  const res = await fetch(`/api/titles/${editing.id}`, { ...json({ rating: Number(rf.rating.value), review: rf.review.value }), method: 'PATCH' });
   if (res.status === 401) { dlg.close(); return init(); }
   if (!res.ok) { $('reviewErr').textContent = (await res.json()).error; return; }
   dlg.close();

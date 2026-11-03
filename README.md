@@ -10,6 +10,7 @@ Live: https://backlog-ae42.azurewebsites.net
 - **Owner** (`me`): add, mark watched, rate 1–5, write or edit a review, remove anything.
 - **Friend**: add titles, remove their own unwatched titles, read reviews.
 - **Public** (`/` when signed out, always at `/public`; data from `GET /api/public`): posters, titles, years, ratings and reviews only. Notes and who-added-what are never exposed.
+- **TV view** (`/screen`): a full-screen, no-interaction display of what's in progress and a sliding strip of what's up next, for a TV or spare monitor. Uses the same public data and refreshes itself every minute.
 - Node 22 + Express, SQLite (`better-sqlite3`), plain HTML/CSS/JS with no build step.
 
 ## Run locally

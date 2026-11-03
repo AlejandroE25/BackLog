@@ -53,6 +53,7 @@ function createApp(dbPath, { passcode, secret, omdbKey, tmdbToken, fetch }) {
   const publicWatched = db.prepare(`SELECT ${PUBLIC}, rating, review, watched_at FROM titles WHERE watched_at IS NOT NULL ORDER BY watched_at DESC, id DESC`);
   app.get('/api/public', (req, res) => res.json({ inProgress: publicInProgress.all(), queue: publicQueue.all(), watched: publicWatched.all() }));
   app.get('/public', (req, res) => res.sendFile(page('public.html')));
+  app.get('/screen', (req, res) => res.sendFile(page('screen.html'))); // TV view, same public data
 
   authRoutes(app, { passcode, secret });
 

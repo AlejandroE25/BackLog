@@ -47,3 +47,12 @@ test('favicon assets are served and both pages link them', async () => {
     assert.match((await request(a).get(path)).text, /rel="icon" href="\/favicon\.svg"/, path);
   }
 });
+
+test('/screen is the TV view, open to everyone, and shows only public data', async () => {
+  const a = app();
+  for (const agent of [request(a), await login(a)]) {
+    const res = await agent.get('/screen');
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.text.includes('id="screen"') && !res.text.includes('id="app"'));
+  }
+});

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BackLog screen</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<meta name="theme-color" content="#170c30">
+<style>
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column; overflow: hidden; cursor: none; color: #f4f0ff;
+  font: 1.6vh/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: radial-gradient(120% 90% at 20% 0%, #4c2889 0%, #170c30 60%, #0b0618 100%);
+}
+[hidden] { display: none !important; }
+header { padding: 3.5vh 4vw 0; display: flex; align-items: baseline; gap: 2vw; }
+h1 { margin: 0; font-size: 5vh; letter-spacing: -.02em; }
+h1 span { color: #a78bfa; }
+h2 { margin: 0 0 2vh 4vw; font-size: 2.4vh; letter-spacing: .18em; text-transform: uppercase; color: #c4b5fd; font-weight: 600; }
+section { padding-top: 3vh; }
+#now { display: flex; gap: 2.5vw; padding: 0 4vw; }
+.now { display: flex; gap: 1.6vw; flex: 0 1 34vw; min-width: 0; }
+.now .poster { height: 38vh; border-radius: 1vh; flex: none; box-shadow: 0 1vh 4vh rgb(0 0 0 / .55); }
+.now h3 { margin: 0 0 .6vh; font-size: 3.4vh; line-height: 1.15; overflow-wrap: anywhere; }
+.now .sub { color: #c4b5fd; font-size: 2vh; margin-bottom: 1.4vh; }
+.now p { margin: 0; color: #ddd6fe; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+#queueSection { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.strip { overflow: hidden; }
+.track { display: flex; gap: 2vh; width: max-content; padding: 0 4vw; }
+.track.run { animation: slide var(--dur, 60s) linear infinite; }
+.track.still { width: 100%; justify-content: center; }
+@keyframes slide { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .track.run { animation: none; } .strip { overflow-x: auto; } }
+.poster { aspect-ratio: 2 / 3; object-fit: cover; display: block; background: #2a1650; }
+.q { flex: none; } .q .poster { height: 30vh; border-radius: 1vh; box-shadow: 0 .6vh 2.4vh rgb(0 0 0 / .5); }
+.noposter { display: grid; place-items: center; font-size: 8vh; font-weight: 700; color: #7c6aa8; }
+#empty { margin: auto; text-align: center; font-size: 3vh; color: #c4b5fd; }
+</style>
+</head>
+<body>
+<header><h1 id="screen">Back<span>Log</span></h1></header>
+<section id="nowSection" hidden><h2>Now watching</h2><div id="now"></div></section>
+<section id="queueSection" hidden><h2>Up next</h2><div class="strip"><div class="track" id="queue"></div></div></section>
+<div id="empty" hidden>Nothing on the list yet.</div>
+<script>
+const $ = (id) => document.getElementById(id);
+// textContent only, never innerHTML: titles and plots are user-influenced text
+const el = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag);
+  Object.assign(n, props);
+  n.append(...kids);
+  return n;
+};
+function poster(t) {
+  const fallback = () => el('div', { className: 'poster noposter', textContent: t.title.trim().charAt(0).toUpperCase() });
+  if (!t.poster_url) return fallback();
+  const img = el('img', { className: 'poster', src: t.poster_url, alt: '', referrerPolicy: 'no-referrer' });
+  img.addEventListener('error', () => img.replaceWith(fallback()));
+  return img;
+}
+const meta = (t) => [t.year, t.kind === 'show' ? 'Show' : 'Movie'].filter(Boolean).join(' · ');
+const nowCard = (t) => el('div', { className: 'now' }, poster(t),
+  el('div', {}, el('h3', { textContent: t.title }), el('div', { className: 'sub', textContent: meta(t) }), el('p', { textContent: t.plot || '' })));
+const queueCard = (t) => el('div', { className: 'q' }, poster(t));
+
+function fillQueue(queue) {
+  const track = $('queue');
+  track.className = 'track';
+  track.replaceChildren(...queue.map(queueCard));
+  if (track.scrollWidth <= innerWidth) return track.classList.add('still');
+  // two copies slide left by exactly one copy's width, so the loop has no seam
+  track.append(...queue.map(queueCard));
+  track.style.setProperty('--dur', `${queue.length * 6}s`);
+  track.classList.add('run');
+}
+
+let last = '';
+async function refresh() {
+  try {
+    const res = await fetch('/api/public', { cache: 'no-store' });
+    if (!res.ok) return;
+    const raw = await res.text();
+    if (raw === last) return; // unchanged: don't restart the slide
+    last = raw;
+    const { inProgress, queue } = JSON.parse(raw);
+    $('now').replaceChildren(...inProgress.map(nowCard));
+    $('nowSection').hidden = !inProgress.length;
+    $('queueSection').hidden = !queue.length;
+    $('empty').hidden = inProgress.length + queue.length > 0;
+    if (queue.length) fillQueue(queue);
+  } catch { /* keep showing the last good screen */ }
+}
+refresh();
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>
